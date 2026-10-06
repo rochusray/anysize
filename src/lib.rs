@@ -1,4 +1,6 @@
-use std::{
+#![no_std]
+
+use core::{
     fmt::{self, Formatter, Write},
     ops::{Add, AddAssign, Sub, SubAssign},
     usize,

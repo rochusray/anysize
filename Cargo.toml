@@ -1,12 +1,12 @@
 [package]
 name = "anysize"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "A zero cost abstraction, adding types for data sizes"
+description = "A no-std zero cost abstraction, adding types for data sizes"
 repository = "https://github.com/rocco123q/anysize"
-keywords = ["bit", "bits", "byte", "bytes"]
-categories = ["data-structures", "development-tools"]
+keywords = ["bit", "bits", "byte", "bytes", "no-std"]
+categories = ["data-structures", "development-tools", "no-std"]
 
 [dependencies]
 concat-idents = "1.1.5"
