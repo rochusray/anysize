@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2024"
 license = "LICENCE.md"
 description = "A no-std zero cost abstraction, adding types for data sizes"
-repository = "https://github.com/rocco123q/anysize"
+repository = "https://github.com/rochusray/anysize"
 keywords = ["bit", "bits", "byte", "bytes", "no-std"]
 categories = ["data-structures", "development-tools", "no-std"]
 
