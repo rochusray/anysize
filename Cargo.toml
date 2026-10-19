@@ -2,7 +2,7 @@
 name = "anysize"
 version = "0.2.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "LICENCE.md"
 description = "A no-std zero cost abstraction, adding types for data sizes"
 repository = "https://github.com/rocco123q/anysize"
 keywords = ["bit", "bits", "byte", "bytes", "no-std"]
