@@ -3,7 +3,6 @@
 use core::{
     fmt::{self, Formatter, Write},
     ops::{Add, AddAssign, Sub, SubAssign},
-    usize,
 };
 
 const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P'];
