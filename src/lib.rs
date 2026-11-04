@@ -7,10 +7,51 @@ use core::{
 
 const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P'];
 
+macro_rules! get_bits_from_type_value {
+    ($vis:vis, u8, U8, $val:expr) => {
+        #[cfg(any(all(feature = "u16", feature = "bits"), not(any(feature = "u16", feature = "u32", feature = "usize"))))]
+        get_bits_from_type_value!($vis, u16, U16, $val);
+        #[cfg(all(not(feature = "u16"), feature = "u32"))]
+        get_bits_from_type_value!($vis, u32, U32, $val);
+        #[cfg(all(not(feature = "u16"), not(feature = "u32"), feature = "usize"))]
+        get_bits_from_type_value!($vis, usize, USize, $val);
+    };
+    ($vis:vis, $ty:ident, $name:ident, $val:expr $(, $feature:literal)?) => {
+        concat_idents::concat_idents!(bits_ident = Bits, $name {
+            /// Amount of bits, describing the size of this type
+            /// # Examples
+            /// ```
+            /// use anysize::*;
+            /// assert_eq!(BitsU8::BITS.get(), 1u16);
+            /// assert_eq!(BytesU32::BITS.get(), 8u32);
+            /// assert_eq!(WordsU32::BITS.get(), 32u32);
+            /// assert_eq!(ZWordsU8::BITS.get(), 512u16);
+            /// ```
+            /// Note: The type is at least 16bit
+            #[cfg(feature = "bits")]
+            $vis const BITS: bits_ident = bits_ident::new($val as $ty);
+
+            /// Amount of bits, describing the size of this type
+            /// # Examples
+            /// ```
+            /// use anysize::*;
+            /// assert_eq!(BitsU8::BITS, 1u8);
+            /// assert_eq!(BytesU32::BITS, 8u32);
+            /// assert_eq!(WordsU32::BITS, 32u32);
+            /// assert_eq!(ZWordsU8::BITS, 512u16);
+            /// ```
+            /// Note: The type is at least 16bit
+            #[cfg(not(feature = "bits"))]
+            $vis const BITS: $ty = $val as $ty;
+        });
+    }
+}
+
 /// For generating conversion functions between data types
+#[allow(unused_macros)]
 macro_rules! generate_type_conversion_fn {
     {
-        $vis:vis $a_base_ident:ident => $b_base_ident:ident as $ident:ident {
+        $vis:vis $a_base_ident:ident ($a_bit_size:literal) => $b_base_ident:ident ($b_bit_size:literal) as $ident:ident {
             $(#[feature($feature:literal)] $ty:ident as $name:ident),+$(,)?
         }
     } => {
@@ -39,10 +80,10 @@ macro_rules! generate_type_conversion_fn {
                         /// ```
                         #[must_use]
                         $vis const fn into_b(self) -> $b_base_ident {
-                            if $a_base_ident::BITS.gt($b_base_ident::BITS) {
-                                $b_base_ident::new(self.mul($a_base_ident::BITS.get() / $b_base_ident::BITS.get()).get())
+                            if $a_bit_size > $b_bit_size {
+                                $b_base_ident::new(self.mul(($a_bit_size as u16 / $b_bit_size as u16) as $ty).get())
                             } else {
-                                $b_base_ident::new(self.div_ceil($b_base_ident::BITS.get() / $a_base_ident::BITS.get()).get())
+                                $b_base_ident::new(self.div_ceil((if ($b_bit_size as u16 / $a_bit_size as u16) > 256 { 1 } else { $b_bit_size / $a_bit_size }) as $ty).get())
                             }
                         }
                     }
@@ -139,13 +180,13 @@ macro_rules! generate_size_conversion_fn {
 macro_rules! generate_base {
     {
         $words:ident = $bit_size:literal;
-        $vis:vis struct $base_ident:ident: $(#[feature($feature:literal)] $var_ty:ident $(as $var_ident:ident)?),+;
+        $vis:vis struct $base_ident:ident: $(#[feature($feature:literal)] $var_ty:ident as $var_ident:ident),+$(,)?
     } => {
         $(
             #[cfg(feature = $feature)]
             #[cfg_attr(not(feature = $feature), allow(rust_analyzer::inactive_code))]
-            concat_idents::concat_idents!(struct_ident = $base_ident $(, $var_ident)? {
-                /// Zero cost abstraction to add differenciate data size types.
+            concat_idents::concat_idents!(struct_ident = $base_ident, $var_ident {
+                /// Const zero cost abstraction to add differenciate data size types.
                 /// # Examples
                 /// ```
                 /// use anysize::*;
@@ -172,11 +213,11 @@ macro_rules! generate_base {
                 /// // So you need for example 2 bytes for 12 bits
                 /// let words = bytes.as_words();
                 /// assert_eq!(words.get(), 1);
-                /// let words_to_bits = words.as_bits();
-                /// assert_eq!(words_to_bits.get(), 32);
-                /// assert_ne!(bits, words_to_bits);
+                /// let words_as_bits = words.as_bits();
+                /// assert_eq!(words_as_bits.get(), 32);
+                /// assert_ne!(bits, words_as_bits);
                 ///
-                /// // Sizes also
+                /// // Sizes are also universally interchangeable
                 /// let bits = BitsU8::new(200);
                 /// assert_eq!(bits.get(), 200);
                 /// // bits + BitsU8::new(100) would panic, because 200 + 100 > u8::MAX
@@ -186,42 +227,28 @@ macro_rules! generate_base {
                 /// assert_eq!(bits.get(), 300);
                 ///
                 /// // Get
-                /// assert_eq!(WordsU8::BITS, BitsU8::new(32));
+                /// assert_eq!(WordsU8::BITS, BitsU16::new(32));
                 /// let bytes = BytesUSize::of::<u32>();
                 /// assert_eq!(bytes.get(), size_of::<u32>());
                 ///
                 /// // Math
                 /// assert_eq!(BytesU8::new(2) + BytesU8::new(6), BytesU8::new(8));
                 /// ```
-                #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+                #[repr(transparent)]
+                #[derive(Clone,Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
                 $vis struct struct_ident {
                    pub(self) inner: $var_ty
                 }
 
-                impl Clone for struct_ident {
-                    fn clone(&self) -> Self {
-                        Self::new(self.inner)
-                    }
-                }
-                impl Copy for struct_ident {}
                 impl Default for struct_ident {
+                    #[inline(always)]
                     fn default() -> Self {
                         Self::ZERO
                     }
                 }
 
                 impl struct_ident {
-                    concat_idents::concat_idents!(bits_ident = Bits $(, $var_ident)? {
-                        /// Amount of bits, describing the size of this type
-                        /// # Examples
-                        /// ```
-                        /// use anysize::*;
-                        /// assert_eq!(BitsU8::BITS.get(), 1);
-                        /// assert_eq!(BytesU32::BITS.get(), 8);
-                        /// assert_eq!(WordsU32::BITS.get(), 32);
-                        /// ```
-                        $vis const BITS: bits_ident = bits_ident::new($bit_size);
-                    });
+                    get_bits_from_type_value!($vis, $var_ty, $var_ident, $bit_size);
 
                     $vis const ZERO: Self = Self::new(0);
                     $vis const ONE: Self = Self::new(1);
@@ -237,7 +264,7 @@ macro_rules! generate_base {
                     #[must_use]
                     #[inline(always)]
                     $vis const fn new($words: $var_ty) -> Self {
-                        Self { inner: $words }
+                       Self { inner: $words }
                     }
                     /// Gets the value as integer
                     /// # Examples
@@ -260,13 +287,14 @@ macro_rules! generate_base {
                     /// assert_eq!(BytesUSize::of::<isize>().get(), size_of::<isize>());
                     /// ```
                     #[must_use]
+                    #[inline]
                     $vis const fn of<T>() -> Self {
                         let size = if $bit_size < 8 {
-                            size_of::<T>() * (8 / $bit_size)
+                            size_of::<T>() * ((8 / $bit_size) as usize)
                         } else if $bit_size == 8 {
                             size_of::<T>()
                         } else {
-                            size_of::<T>().div_ceil($bit_size / 8)
+                            size_of::<T>().div_ceil(($bit_size / 8) as usize)
                         };
                         assert!(size <= $var_ty::MAX as usize);
                         Self::new(size as $var_ty)
@@ -275,13 +303,13 @@ macro_rules! generate_base {
                     #[must_use]
                     #[inline(always)]
                     $vis const fn next_power_of_two(self) -> Self {
-                        Self::new(self.get().next_power_of_two())
+                        Self::new(self.inner.next_power_of_two())
                     }
                     /// Returns if the value is a power of two
                     #[must_use]
                     #[inline(always)]
                     $vis const fn is_power_of_two(self) -> bool {
-                        self.get().is_power_of_two()
+                        self.inner.is_power_of_two()
                     }
 
                     /// Const addition
@@ -531,7 +559,7 @@ macro_rules! generate_base {
     };
 }
 macro_rules! generate {
-    ($vis:vis $words:ident = $bit_size:literal as $name:ident $(, impl Into<$(#[feature($feature:literal)] $impl_ty:ident as $impl_words:ident),+$(,)?>)*) => {
+    ($vis:vis $words:ident = $bit_size:literal as $name:ident $(, impl Into<$(#[feature($feature:literal)] $impl_ty:ident ($impl_bits:literal) as $impl_words:ident),+$(,)?>)*) => {
         generate_base! {
             $words = $bit_size;
             $vis struct $name:
@@ -540,7 +568,7 @@ macro_rules! generate {
                 #[feature("u32")] u32 as U32,
                 #[feature("u64")] u64 as U64,
                 #[feature("u128")] u128 as U128,
-                #[feature("usize")] usize as USize;
+                #[feature("usize")] usize as USize,
         }
         generate_size_conversion_fn! {
             $vis $name as $words {
@@ -576,7 +604,7 @@ macro_rules! generate {
                 #[cfg(feature = $feature)]
                 #[cfg_attr(not(feature = $feature), allow(rust_analyzer::inactive_code))]
                 generate_type_conversion_fn! {
-                    $vis $name => $impl_ty as $impl_words {
+                    $vis $name ($bit_size) => $impl_ty ($impl_bits) as $impl_words {
                         #[feature("u8")] u8 as U8,
                         #[feature("u16")] u16 as U16,
                         #[feature("u32")] u32 as U32,
@@ -592,54 +620,88 @@ macro_rules! generate {
 
 #[cfg(feature = "bits")]
 generate!(pub bits = 1 as Bits, impl Into<
-    #[feature("bytes")] Bytes as bytes,
-    #[feature("hwords")] HWords as hwords,
-    #[feature("words")] Words as words,
-    #[feature("dwords")] DWords as dwords,
-    #[feature("qwords")] QWords as qwords,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("words")] Words (32) as words,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("ywords")] YWords (256) as ywords,
+    #[feature("zwords")] ZWords (512) as zwords,
 >);
 
 #[cfg(feature = "bytes")]
 generate!(pub bytes = 8 as Bytes, impl Into<
-    #[feature("bits")] Bits as bits,
-    #[feature("hwords")] HWords as hwords,
-    #[feature("words")] Words as words,
-    #[feature("dwords")] DWords as dwords,
-    #[feature("qwords")] QWords as qwords,
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("words")] Words (32) as words,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("ywords")] YWords (256) as ywords,
+    #[feature("zwords")] ZWords (512) as zwords,
 >);
 
 #[cfg(feature = "hwords")]
 generate!(pub hwords = 16 as HWords, impl Into<
-    #[feature("bits")] Bits as bits,
-    #[feature("bytes")] Bytes as bytes,
-    #[feature("words")] Words as words,
-    #[feature("dwords")] DWords as dwords,
-    #[feature("qwords")] QWords as qwords,
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("words")] Words (32) as words,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("ywords")] YWords (256) as ywords,
+    #[feature("zwords")] ZWords (512) as zwords,
 >);
 
 #[cfg(feature = "words")]
 generate!(pub words = 32 as Words, impl Into<
-    #[feature("bits")] Bits as bits,
-    #[feature("bytes")] Bytes as bytes,
-    #[feature("hwords")] HWords as hwords,
-    #[feature("dwords")] DWords as dwords,
-    #[feature("qwords")] QWords as qwords,
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("ywords")] YWords (256) as ywords,
+    #[feature("zwords")] ZWords (512) as zwords,
 >);
 
 #[cfg(feature = "dwords")]
 generate!(pub dwords = 64 as DWords, impl Into<
-    #[feature("bits")] Bits as bits,
-    #[feature("bytes")] Bytes as bytes,
-    #[feature("hwords")] HWords as hwords,
-    #[feature("words")] Words as words,
-    #[feature("qwords")] QWords as qwords,
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("words")] Words (32) as words,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("ywords")] YWords (256) as ywords,
+    #[feature("zwords")] ZWords (512) as zwords,
 >);
 
 #[cfg(feature = "qwords")]
 generate!(pub qwords = 128 as QWords, impl Into<
-    #[feature("bits")] Bits as bits,
-    #[feature("bytes")] Bytes as bytes,
-    #[feature("hwords")] HWords as hwords,
-    #[feature("words")] Words as words,
-    #[feature("dwords")] DWords as dwords,
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("words")] Words (32) as words,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("ywords")] YWords (256) as ywords,
+    #[feature("zwords")] ZWords (512) as zwords,
+>);
+
+#[cfg(feature = "ywords")]
+generate!(pub ywords = 256 as YWords, impl Into<
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("words")] Words (32) as words,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("zwords")] ZWords (512) as zwords,
+>);
+
+#[cfg(feature = "zwords")]
+generate!(pub zwords = 512 as ZWords, impl Into<
+    #[feature("bits")] Bits (1) as bits,
+    #[feature("bytes")] Bytes (8) as bytes,
+    #[feature("hwords")] HWords (16) as hwords,
+    #[feature("words")] Words (32) as words,
+    #[feature("dwords")] DWords (64) as dwords,
+    #[feature("qwords")] QWords (128) as qwords,
+    #[feature("ywords")] YWords (256) as ywords,
 >);
