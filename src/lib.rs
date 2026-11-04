@@ -235,16 +235,9 @@ macro_rules! generate_base {
                 /// assert_eq!(BytesU8::new(2) + BytesU8::new(6), BytesU8::new(8));
                 /// ```
                 #[repr(transparent)]
-                #[derive(Clone,Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+                #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
                 $vis struct struct_ident {
                    pub(self) inner: $var_ty
-                }
-
-                impl Default for struct_ident {
-                    #[inline(always)]
-                    fn default() -> Self {
-                        Self::ZERO
-                    }
                 }
 
                 impl struct_ident {
