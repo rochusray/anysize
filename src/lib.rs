@@ -180,11 +180,10 @@ macro_rules! generate_size_conversion_fn {
 macro_rules! generate_base {
     {
         $words:ident = $bit_size:literal;
-        $vis:vis struct $base_ident:ident: $(#[feature($feature:literal)] $var_ty:ident as $var_ident:ident),+$(,)?
+        $vis:vis struct $base_ident:ident: $(
+            #[feature($feature:literal)] $var_ty:ident as $var_ident:ident),+$(,)?
     } => {
         $(
-            #[cfg(feature = $feature)]
-            #[cfg_attr(not(feature = $feature), allow(rust_analyzer::inactive_code))]
             concat_idents::concat_idents!(struct_ident = $base_ident, $var_ident {
                 /// Const zero cost abstraction to add differenciate data size types.
                 /// # Examples
@@ -234,12 +233,14 @@ macro_rules! generate_base {
                 /// // Math
                 /// assert_eq!(BytesU8::new(2) + BytesU8::new(6), BytesU8::new(8));
                 /// ```
+                #[cfg(feature = $feature)]
                 #[repr(transparent)]
                 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
                 $vis struct struct_ident {
-                   pub(self) inner: $var_ty
+                   pub(self) inner: $var_ty,
                 }
 
+                #[cfg(feature = $feature)]
                 impl struct_ident {
                     get_bits_from_type_value!($vis, $var_ty, $var_ident, $bit_size);
 
@@ -408,6 +409,7 @@ macro_rules! generate_base {
                     }
                 }
 
+                #[cfg(feature = $feature)]
                 impl Add for struct_ident {
                     type Output = Self;
 
@@ -416,12 +418,14 @@ macro_rules! generate_base {
                         self.add(rhs)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl AddAssign for struct_ident {
                     #[inline(always)]
                     fn add_assign(&mut self, rhs: Self) {
                         *self = self.add(rhs);
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl Sub for struct_ident {
                     type Output = Self;
 
@@ -430,18 +434,21 @@ macro_rules! generate_base {
                         self.sub(rhs)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl SubAssign for struct_ident {
                     #[inline(always)]
                     fn sub_assign(&mut self, rhs: Self) {
                         *self = self.sub(rhs);
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl Into<$var_ty> for struct_ident {
                     #[inline(always)]
                     fn into(self) -> $var_ty {
                         self.get()
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl From<$var_ty> for struct_ident {
                     #[inline(always)]
                     fn from(value:$var_ty) -> struct_ident {
@@ -449,42 +456,49 @@ macro_rules! generate_base {
                     }
                 }
 
+                #[cfg(feature = $feature)]
                 impl fmt::Binary for struct_ident {
                     #[inline(always)]
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::Binary::fmt(&self.inner, f)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::UpperHex for struct_ident {
                     #[inline(always)]
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::Binary::fmt(&self.inner, f)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::LowerHex for struct_ident {
                     #[inline(always)]
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::LowerHex::fmt(&self.inner, f)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::Octal for struct_ident {
                     #[inline(always)]
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::Octal::fmt(&self.inner, f)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::UpperExp for struct_ident {
                     #[inline(always)]
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::UpperExp::fmt(&self.inner, f)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::LowerExp for struct_ident {
                     #[inline(always)]
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::LowerExp::fmt(&self.inner, f)
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::Display for struct_ident {
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         let mut integer = self.get();
@@ -536,6 +550,7 @@ macro_rules! generate_base {
                         })
                     }
                 }
+                #[cfg(feature = $feature)]
                 impl fmt::Debug for struct_ident {
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::Display::fmt(&self.inner, f)?;
