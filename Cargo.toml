@@ -1,6 +1,6 @@
 [package]
 name = "anysize"
-version = "1.0.0"
+version = "0.3.1"
 edition = "2024"
 license-file = "LICENSE.md"
 description = "A const no-std zero cost abstraction, adding types for data sizes"
@@ -10,14 +10,6 @@ categories = ["data-structures", "development-tools", "no-std"]
 
 [dependencies]
 concat-idents = "1.1.5"
-
-[dependencies.bounded-integer]
-version = "0.6.2"
-optional = true
-
-[dependencies.ipow2]
-version = "0.2.1"
-optional = true
 
 [features]
 default = ["default_sizes", "default_types"]
@@ -31,22 +23,6 @@ u64 = []
 u128 = []
 usize = []
 
-# Bounded Internal Types
-bounded_u8 = ["dep:bounded-integer"]
-bounded_u16 = ["dep:bounded-integer"]
-bounded_u32 = ["dep:bounded-integer"]
-bounded_u64 = ["dep:bounded-integer"]
-bounded_u128 = ["dep:bounded-integer"]
-bounded_usize = ["dep:bounded-integer"]
-
-# Pow2 Internal Types
-pow2_u8 = ["dep:ipow2"]
-pow2_u16 = ["dep:ipow2"]
-pow2_u32 = ["dep:ipow2"]
-pow2_u64 = ["dep:ipow2"]
-pow2_u128 = ["dep:ipow2"]
-pow2_usize = ["dep:ipow2"]
-
 # Types
 bits = []
 bytes = []
@@ -58,9 +34,6 @@ ywords = []
 zwords = []
 
 default_sizes = ["u8", "u32", "usize"]
-full_native_sizes = ["u8", "u16", "u32", "u64", "u128", "usize"]
-full_bounded_sizes = ["bounded_u8", "bounded_u16", "bounded_u32", "bounded_u64", "bounded_u128", "bounded_usize"]
-full_pow2_sizes = ["pow2_u8", "pow2_u16", "pow2_u32", "pow2_u64", "pow2_u128", "pow2_usize"]
-full_sizes = ["full_native_sizes", "full_bounded_sizes", "full_pow2_sizes"]
+full_sizes = ["u8", "u16", "u32", "u64", "u128", "usize"]
 default_types = ["bits", "bytes", "words"]
 full_types = ["bits", "bytes", "hwords", "words", "dwords", "qwords", "ywords", "zwords"]
