@@ -28,6 +28,8 @@ assert_eq!(c.get(), 5);
 |Words|32|words|yes|
 |DWords|64|dwords|no|
 |QWords|128|qwords|no|
+|YWords|256|ywords|no|
+|ZWords|512|zwords|no|
 # Variations
 |Inner Type|Feature|Defafult Feature|
 |----|----|----|
