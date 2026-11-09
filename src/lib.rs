@@ -4,9 +4,8 @@ use core::{
     fmt::{self, Formatter, Write},
     ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
 };
-use zerocopy::IntoBytes;
 #[cfg(feature = "zerocopy")]
-use zerocopy::{FromBytes, Immutable, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P', b'E', b'Z', b'Y', b'R', b'Q'];
 
@@ -22,27 +21,11 @@ macro_rules! get_bits_from_type_value {
     ($vis:vis, $ty:ident, $name:ident, $val:expr $(, $feature:literal)?) => {
         concat_idents::concat_idents!(bits_ident = Bits, $name {
             /// Amount of bits, describing the size of this type
-            /// # Examples
-            /// ```
-            /// use anysize::*;
-            /// assert_eq!(BitsU8::BITS.get(), 1u16);
-            /// assert_eq!(BytesU32::BITS.get(), 8u32);
-            /// assert_eq!(WordsU32::BITS.get(), 32u32);
-            /// assert_eq!(ZWordsU8::BITS.get(), 512u16);
-            /// ```
             /// Note: The type is at least 16bit
             #[cfg(feature = "bits")]
             $vis const BITS: bits_ident = bits_ident::new($val as $ty);
 
             /// Amount of bits, describing the size of this type
-            /// # Examples
-            /// ```
-            /// use anysize::*;
-            /// assert_eq!(BitsU8::BITS, 1u8);
-            /// assert_eq!(BytesU32::BITS, 8u32);
-            /// assert_eq!(WordsU32::BITS, 32u32);
-            /// assert_eq!(ZWordsU8::BITS, 512u16);
-            /// ```
             /// Note: The type is at least 16bit
             #[cfg(not(feature = "bits"))]
             $vis const BITS: $ty = $val as $ty;
@@ -70,23 +53,24 @@ macro_rules! generate_type_conversion_fn {
                 });
                 concat_idents::concat_idents!(into_b = as_, $ident {
                     impl $a_base_ident {
-                        /// Converts one kind of data size type into another
-                        /// # Example
-                        /// ```
-                        /// use anysize::*;
-                        /// let words = WordsU32::new(10);
-                        /// let bytes = words.as_bytes();
-                        /// assert_eq!(bytes.get(), 40);
-                        /// let bits = bytes.as_bits();
-                        /// assert_eq!(bits.get(), 320);
-                        /// assert_eq!(words.as_bits().get(), bits.get());
-                        /// ```
+                        #[doc = concat!("Converts a ", stringify!($a_base_ident), stringify!($name), " into a ", stringify!($b_base_ident), stringify!($name))]
+                        #[doc = "# Example"]
+                        #[doc = "```"]
+                        #[doc = concat!("use anysize::", stringify!($a_base_ident), stringify!($name), ";")]
+                        #[doc = concat!("let a = ", stringify!($a_base_ident), stringify!($name), "::new(1);")]
+                        #[doc = concat!("let ", stringify!($ident), " = a.as_", stringify!($ident), "();")]
+                        #[doc = concat!("if ", stringify!($a_bit_size), " > ", stringify!($b_bit_size), " {")]
+                        #[doc = concat!("    assert_eq!(*", stringify!($ident), ", *a * (", stringify!($a_bit_size), " / ", stringify!($b_bit_size), ") as ", stringify!($ty), ");")]
+                        #[doc = "} else {"]
+                        #[doc = concat!("    assert_eq!(*", stringify!($ident), ", *a.div_ceil((", stringify!($b_bit_size), " / ", stringify!($a_bit_size), ").min(1) as ", stringify!($ty), "));")]
+                        #[doc = "}"]
+                        #[doc = "```"]
                         #[must_use]
                         $vis const fn into_b(self) -> $b_base_ident {
                             if $a_bit_size > $b_bit_size {
-                                $b_base_ident::new(self.mul(($a_bit_size as u16 / $b_bit_size as u16) as $ty).get())
+                                $b_base_ident::new(self.mul(($a_bit_size / $b_bit_size) as $ty).get())
                             } else {
-                                $b_base_ident::new(self.div_ceil((if ($b_bit_size as u16 / $a_bit_size as u16) > 256 { 1 } else { $b_bit_size / $a_bit_size }) as $ty).get())
+                                $b_base_ident::new(self.div_ceil((if ($b_bit_size / $a_bit_size) as $ty == 0 { 1 } else { $b_bit_size / $a_bit_size }) as $ty).get())
                             }
                         }
                     }
@@ -120,13 +104,14 @@ macro_rules! generate_size_conversion_fn {
             });
             concat_idents::concat_idents!(into_b = as_, $b_ty {
                 impl $a_name {
-                    /// Converts the size of an object
-                    /// # Example:
-                    /// ```
-                    /// use anysize::*;
-                    /// let bits = BitsU8::new(10);
-                    /// let bits = bits.as_u32();
-                    /// ```
+                    #[doc = concat!("Converts a ", stringify!($base_ident), stringify!($a_name), " into a ", stringify!($base_ident), stringify!($b_name))]
+                    #[doc = "# Example:"]
+                    #[doc = "```"]
+                    #[doc = concat!("use anysize::", stringify!($base_ident), stringify!($a_name), ";")]
+                    #[doc = concat!("let a = ", stringify!($base_ident), stringify!($a_name), "::new(10);")]
+                    #[doc = concat!("let b = a.as_", stringify!($b_ty), "();")]
+                    #[doc = concat!("assert_eq!(a, b.as_", stringify!($a_ty), "());")]
+                    #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
                     $vis const fn into_b(self) -> $b_name {
@@ -142,13 +127,13 @@ macro_rules! generate_size_conversion_fn {
             });
             concat_idents::concat_idents!(into_a = as_, $a_ty {
                 impl $b_name {
-                    /// Converts the size of an object
-                    /// # Example:
-                    /// ```
-                    /// use anysize::*;
-                    /// let bits = BitsU8::new(10);
-                    /// let bits = bits.as_u32();
-                    /// ```
+                    #[doc = concat!("Converts a ", stringify!($base_ident), stringify!($b_name), " into a ", stringify!($base_ident), stringify!($a_name))]
+                    #[doc = "# Example:"]
+                    #[doc = "```"]
+                    #[doc = concat!("use anysize::", stringify!($base_ident), stringify!($b_name), ";")]
+                    #[doc = concat!("let a = ", stringify!($base_ident), stringify!($b_name), "::new(10);")]
+                    #[doc = concat!("let b = a.as_", stringify!($a_ty), "();")]
+                    #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
                     $vis const fn into_a(self) -> $a_name {
@@ -174,54 +159,7 @@ macro_rules! generate_base {
     } => {
         $(
             concat_idents::concat_idents!(struct_ident = $base_ident, $var_ident {
-                /// Const zero cost abstraction to add differenciate data size types.
-                /// # Examples
-                /// ```
-                /// use anysize::*;
-                /// let bits = BitsU8::new(10);
-                /// assert_eq!(bits.get(), 10u8);
-                ///
-                /// let bytes = BytesU8::new(2);
-                /// assert_eq!(bytes.get(), 2u8);
-                ///
-                /// let words = WordsU8::of::<u128>();
-                /// assert_eq!(words.get(), 4);
-                ///
-                /// // Sizes are equal to the suffix
-                /// assert_eq!(size_of::<BytesU8>(), size_of::<u8>());
-                /// assert_eq!(size_of::<BitsU32>(), size_of::<u32>());
-                /// assert_eq!(size_of::<WordsUSize>(), size_of::<usize>());
-                ///
-                /// // Types are universally interchangeable
-                /// let bits = BitsU8::new(16);
-                /// assert_eq!(bits.get(), 16);
-                /// let bytes = bits.as_bytes();
-                /// assert_eq!(bytes.get(), 2);
-                /// // A.as_B asks the question: "How many B do I need to fit A"
-                /// // So you need for example 2 bytes for 12 bits
-                /// let words = bytes.as_words();
-                /// assert_eq!(words.get(), 1);
-                /// let words_as_bits = words.as_bits();
-                /// assert_eq!(words_as_bits.get(), 32);
-                /// assert_ne!(bits, words_as_bits);
-                ///
-                /// // Sizes are also universally interchangeable
-                /// let bits = BitsU8::new(200);
-                /// assert_eq!(bits.get(), 200);
-                /// // bits + BitsU8::new(100) would panic, because 200 + 100 > u8::MAX
-                /// let mut bits = bits.as_u32();
-                /// assert_eq!(bits.get(), 200);
-                /// bits += BitsU32::new(100);
-                /// assert_eq!(bits.get(), 300);
-                ///
-                /// // Get
-                /// assert_eq!(WordsU8::BITS, BitsU16::new(32));
-                /// let bytes = BytesUSize::of::<u32>();
-                /// assert_eq!(bytes.get(), size_of::<u32>());
-                ///
-                /// // Math
-                /// assert_eq!(BytesU8::new(2) + BytesU8::new(6), BytesU8::new(8));
-                /// ```
+                #[doc = "Const zero cost abstraction to add differenciate data size types."]
                 #[cfg(feature = $feature)]
                 #[repr(transparent)]
                 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -241,38 +179,39 @@ macro_rules! generate_base {
                     $vis const ONE: Self = Self::new(1);
                     $vis const MAX: Self = Self::new($var_ty::MAX);
 
-                    /// Will create a new instance of the given type
-                    /// # Examples
-                    /// ```
-                    /// use anysize::*;
-                    /// let bytes = BytesU32::new(10);
-                    /// assert_eq!(bytes.get(), 10);
-                    /// ```
+                    #[doc = "Will create a new instance of the given type"]
+                    #[doc = "# Examples"]
+                    #[doc = "```"]
+                    #[doc = concat!("use anysize::", stringify!($base_ident), stringify!($var_ident), ";")]
+                    #[doc = concat!("let ", stringify!($words), " = ", stringify!($base_ident), stringify!($var_ident), "::new(10);")]
+                    #[doc = concat!("assert_eq!(*", stringify!($words), ", 10);")]
+                    #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
                     $vis const fn new($words: $var_ty) -> Self {
                        Self { inner: $words }
                     }
-                    /// Gets the value as integer
-                    /// # Examples
-                    /// ```
-                    /// use anysize::*;
-                    /// let bytes = BytesU32::new(10);
-                    /// assert_eq!(bytes.get(), 10);
-                    /// ```
+                    #[doc = "Gets the value as integer"]
+                    #[doc = "# Examples"]
+                    #[doc = "```"]
+                    #[doc = concat!("use anysize::", stringify!($base_ident), stringify!($var_ident), ";")]
+                    #[doc = concat!("let a = ", stringify!($base_ident), stringify!($var_ident), "::new(25);")]
+                    #[doc = "assert_eq!(a.get(), 25);"]
+                    #[doc = "assert_eq!(a.get(), *a);"]
+                    #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
                     $vis const fn get(self) -> $var_ty {
                         self.inner
                     }
-                    /// Creates new instance, depending on the size of a type
-                    /// # Examples
-                    /// ```
-                    /// use anysize::*;
-                    /// assert_eq!(BitsU32::of::<u128>().get(), 128);
-                    /// assert_eq!(WordsU8::of::<u64>().get(), 2);
-                    /// assert_eq!(BytesUSize::of::<isize>().get(), size_of::<isize>());
-                    /// ```
+                    #[doc = "Creates new instance, depending on the size of a type"]
+                    #[cfg_attr(feature = "bytes", doc = "# Examples")]
+                    #[cfg_attr(feature = "bytes", doc = "```")]
+                    #[cfg_attr(feature = "bytes", doc = "use anysize::*;")]
+                    #[cfg_attr(feature = "bytes", doc = concat!("assert_eq!(*Into::<Bytes", stringify!($var_ident), ">::into(", stringify!($base_ident), stringify!($var_ident), "::of::<u8>()) as usize, size_of::<u8>().next_multiple_of(", stringify!($bit_size), "usize.div_ceil(8)));"))]
+                    #[cfg_attr(feature = "bytes", doc = concat!("assert_eq!(*Into::<Bytes", stringify!($var_ident), ">::into(", stringify!($base_ident), stringify!($var_ident), "::of::<u32>()) as usize, size_of::<u32>().next_multiple_of(", stringify!($bit_size), "usize.div_ceil(8)));"))]
+                    #[cfg_attr(feature = "bytes", doc = concat!("assert_eq!(*Into::<Bytes", stringify!($var_ident), ">::into(", stringify!($base_ident), stringify!($var_ident), "::of::<usize>()) as usize, size_of::<usize>().next_multiple_of(", stringify!($bit_size), "usize.div_ceil(8)));"))]
+                    #[cfg_attr(feature = "bytes", doc = "```")]
                     #[must_use]
                     #[inline]
                     $vis const fn of<T>() -> Self {
@@ -286,17 +225,11 @@ macro_rules! generate_base {
                         assert!(size <= $var_ty::MAX as usize);
                         Self::new(size as $var_ty)
                     }
-                    /// Returns the next power of two
+                    #[doc = "Returns the next power of two"]
                     #[must_use]
                     #[inline(always)]
                     $vis const fn next_power_of_two(self) -> Self {
                         Self::new(self.inner.next_power_of_two())
-                    }
-                    /// Returns if the value is a power of two
-                    #[must_use]
-                    #[inline(always)]
-                    $vis const fn is_power_of_two(self) -> bool {
-                        self.inner.is_power_of_two()
                     }
 
                     /// Const addition

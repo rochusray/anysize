@@ -1,6 +1,6 @@
 [package]
 name = "anysize"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 license-file = "LICENSE.md"
 description = "A const no-std zero cost abstraction, adding types for data sizes"
@@ -17,8 +17,7 @@ optional = true
 features = ["derive"]
 
 [features]
-default = ["full"]
-#default = ["default_sizes", "default_types"]
+default = ["default_sizes", "default_types"]
 full = ["full_sizes", "full_types", "zerocopy"]
 
 zerocopy = ["dep:zerocopy"]
