@@ -34,7 +34,7 @@ assert_eq!(c.get(), 5);
 |Inner Type|Feature|Defafult Feature|
 |----|----|----|
 |u8|u8|yes|
-|u16|u16|no|
+|u16|u16|yes|
 |u32|u32|yes|
 |u64|u64|no|
 |u128|u128|no|
