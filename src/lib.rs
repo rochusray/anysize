@@ -2,7 +2,7 @@
 
 use core::{
     fmt::{self, Formatter, Write},
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
 };
 use zerocopy::IntoBytes;
 #[cfg(feature = "zerocopy")]
@@ -442,6 +442,22 @@ macro_rules! generate_base {
                         *self = self.sub(rhs);
                     }
                 }
+
+                #[cfg(feature = $feature)]
+                impl Deref for struct_ident {
+                    type Target = $var_ty;
+
+                    fn deref(&self) -> &Self::Target {
+                        &self.inner
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl DerefMut for struct_ident {
+                    fn deref_mut(&mut self) -> &mut Self::Target {
+                        &mut self.inner
+                    }
+                }
+
                 #[cfg(feature = $feature)]
                 impl Into<$var_ty> for struct_ident {
                     #[inline(always)]
