@@ -4,6 +4,9 @@ use core::{
     fmt::{self, Formatter, Write},
     ops::{Add, AddAssign, Sub, SubAssign},
 };
+use zerocopy::IntoBytes;
+#[cfg(feature = "zerocopy")]
+use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P', b'E', b'Z', b'Y', b'R', b'Q'];
 
@@ -222,6 +225,10 @@ macro_rules! generate_base {
                 #[cfg(feature = $feature)]
                 #[repr(transparent)]
                 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+                #[cfg_attr(
+                    feature = "zerocopy",
+                    derive(FromBytes, Immutable, KnownLayout)
+                )]
                 $vis struct struct_ident {
                    pub(self) inner: $var_ty,
                 }
@@ -392,6 +399,14 @@ macro_rules! generate_base {
                         } else {
                             self
                         }
+                    }
+
+                    /// Implements zerocopy::IntoBytes
+                    #[must_use]
+                    #[inline(always)]
+                    #[cfg(feature = "zerocopy")]
+                    $vis fn as_byte_slice(&self) -> &[u8] {
+                        self.inner.as_bytes()
                     }
                 }
 

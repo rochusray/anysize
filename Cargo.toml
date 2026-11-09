@@ -11,9 +11,17 @@ categories = ["data-structures", "development-tools", "no-std"]
 [dependencies]
 concat-idents = "1.1.5"
 
+[dependencies.zerocopy]
+version = "0.8"
+optional = true
+features = ["derive"]
+
 [features]
-default = ["default_sizes", "default_types"]
-full = ["full_sizes", "full_types"]
+default = ["full"]
+#default = ["default_sizes", "default_types"]
+full = ["full_sizes", "full_types", "zerocopy"]
+
+zerocopy = ["dep:zerocopy"]
 
 # Native Internal Types
 u8 = []
