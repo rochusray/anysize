@@ -118,22 +118,15 @@ macro_rules! generate_size_conversion_fn {
             concat_idents::concat_idents!(into_b = as_, $b_ty {
                 impl $a_name {
                     /// Converts the size of an object
-                    /// # Panics:
-                    /// Will panic if value won't fit in new type
                     /// # Example:
                     /// ```
                     /// use anysize::*;
                     /// let bits = BitsU8::new(10);
-                    /// let bits = bits.as_u32(); // Can't panic, because size_of::<u8>() < size_of::<u32>()
-                    /// let bits = bits + BitsU32::new(100000);
-                    /// // bits.as_u8(); Will panic here
+                    /// let bits = bits.as_u32();
                     /// ```
                     #[must_use]
                     #[inline(always)]
                     $vis const fn into_b(self) -> $b_name {
-                        if 1 $cmp 0 {
-                            assert!(self.get() <= $b_ty::MAX as $a_ty);
-                        }
                         $b_name::new(self.get() as $b_ty)
                     }
                 }
@@ -147,22 +140,15 @@ macro_rules! generate_size_conversion_fn {
             concat_idents::concat_idents!(into_a = as_, $a_ty {
                 impl $b_name {
                     /// Converts the size of an object
-                    /// # Panics:
-                    /// Will panic if value won't fit in new type
                     /// # Example:
                     /// ```
                     /// use anysize::*;
                     /// let bits = BitsU8::new(10);
-                    /// let bits = bits.as_u32(); // Can't panic, because size_of::<u8>() < size_of::<u32>()
-                    /// let bits = bits + BitsU32::new(100000);
-                    /// // bits.as_u8(); Would panic here
+                    /// let bits = bits.as_u32();
                     /// ```
                     #[must_use]
                     #[inline(always)]
                     $vis const fn into_a(self) -> $a_name {
-                        if 0 $cmp 1 {
-                            assert!(self.get() <= $a_ty::MAX as $b_ty);
-                        }
                         $a_name::new(self.get() as $a_ty)
                     }
                 }
