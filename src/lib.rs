@@ -5,7 +5,7 @@ use core::{
     ops::{Add, AddAssign, Sub, SubAssign},
 };
 
-const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P'];
+const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P', b'E', b'Z', b'Y', b'R', b'Q'];
 
 macro_rules! get_bits_from_type_value {
     ($vis:vis, u8, U8, $val:expr) => {
@@ -540,8 +540,9 @@ macro_rules! generate_base {
                         }
 
                         f.write_char(' ')?;
-                        if unit < UNITS.len().min(u8::MAX as usize) as u8 {
+                        if unit < UNITS.len() as u8 {
                             f.write_char(UNITS[unit as usize] as char)?;
+                            f.write_char('i');
                         }
                         f.write_str(if integer == 1 && fraction == 0 {
                             &stringify!($words)[0..(stringify!($words).len() - 1)]
