@@ -180,7 +180,7 @@ macro_rules! generate_size_conversion_fn {
 macro_rules! generate_base {
     {
         $words:ident = $bit_size:literal;
-        $vis:vis struct $base_ident:ident: $(
+        $vis:vis struct $base_ident:ident ($short_name:literal): $(
             #[feature($feature:literal)] $var_ty:ident as $var_ident:ident),+$(,)?
     } => {
         $(
@@ -542,13 +542,9 @@ macro_rules! generate_base {
                         f.write_char(' ')?;
                         if unit < UNITS.len() as u8 {
                             f.write_char(UNITS[unit as usize] as char)?;
-                            f.write_char('i');
+                            f.write_char('i')?;
                         }
-                        f.write_str(if integer == 1 && fraction == 0 {
-                            &stringify!($words)[0..(stringify!($words).len() - 1)]
-                        } else {
-                            stringify!($words)
-                        })
+                        f.write_str($short_name)
                     }
                 }
                 #[cfg(feature = $feature)]
@@ -556,11 +552,7 @@ macro_rules! generate_base {
                     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                         fmt::Display::fmt(&self.inner, f)?;
                         f.write_char(' ')?;
-                        f.write_str(if self.inner == 1 {
-                            &stringify!($words)[0..(stringify!($words).len() - 1)]
-                        } else {
-                            stringify!($words)
-                        })
+                        f.write_str($short_name)
                     }
                 }
             });
@@ -568,10 +560,10 @@ macro_rules! generate_base {
     };
 }
 macro_rules! generate {
-    ($vis:vis $words:ident = $bit_size:literal as $name:ident $(, impl Into<$(#[feature($feature:literal)] $impl_ty:ident ($impl_bits:literal) as $impl_words:ident),+$(,)?>)*) => {
+    ($vis:vis $words:ident = $bit_size:literal as $name:ident ($short_name:literal) $(, impl Into<$(#[feature($feature:literal)] $impl_ty:ident ($impl_bits:literal) as $impl_words:ident),+$(,)?>)*) => {
         generate_base! {
             $words = $bit_size;
-            $vis struct $name:
+            $vis struct $name ($short_name):
                 #[feature("u8")] u8 as U8,
                 #[feature("u16")] u16 as U16,
                 #[feature("u32")] u32 as U32,
@@ -628,7 +620,7 @@ macro_rules! generate {
 }
 
 #[cfg(feature = "bits")]
-generate!(pub bits = 1 as Bits, impl Into<
+generate!(pub bits = 1 as Bits ("b"), impl Into<
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
     #[feature("words")] Words (32) as words,
@@ -639,7 +631,7 @@ generate!(pub bits = 1 as Bits, impl Into<
 >);
 
 #[cfg(feature = "bytes")]
-generate!(pub bytes = 8 as Bytes, impl Into<
+generate!(pub bytes = 8 as Bytes ("B"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("hwords")] HWords (16) as hwords,
     #[feature("words")] Words (32) as words,
@@ -650,7 +642,7 @@ generate!(pub bytes = 8 as Bytes, impl Into<
 >);
 
 #[cfg(feature = "hwords")]
-generate!(pub hwords = 16 as HWords, impl Into<
+generate!(pub hwords = 16 as HWords ("HW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("words")] Words (32) as words,
@@ -661,7 +653,7 @@ generate!(pub hwords = 16 as HWords, impl Into<
 >);
 
 #[cfg(feature = "words")]
-generate!(pub words = 32 as Words, impl Into<
+generate!(pub words = 32 as Words ("W"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -672,7 +664,7 @@ generate!(pub words = 32 as Words, impl Into<
 >);
 
 #[cfg(feature = "dwords")]
-generate!(pub dwords = 64 as DWords, impl Into<
+generate!(pub dwords = 64 as DWords ("DW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -683,7 +675,7 @@ generate!(pub dwords = 64 as DWords, impl Into<
 >);
 
 #[cfg(feature = "qwords")]
-generate!(pub qwords = 128 as QWords, impl Into<
+generate!(pub qwords = 128 as QWords ("QW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -694,7 +686,7 @@ generate!(pub qwords = 128 as QWords, impl Into<
 >);
 
 #[cfg(feature = "ywords")]
-generate!(pub ywords = 256 as YWords, impl Into<
+generate!(pub ywords = 256 as YWords ("YW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -705,7 +697,7 @@ generate!(pub ywords = 256 as YWords, impl Into<
 >);
 
 #[cfg(feature = "zwords")]
-generate!(pub zwords = 512 as ZWords, impl Into<
+generate!(pub zwords = 512 as ZWords ("ZW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
