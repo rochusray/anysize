@@ -10,25 +10,25 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 const UNITS: &[u8] = &[b'K', b'M', b'G', b'T', b'P', b'E', b'Z', b'Y', b'R', b'Q'];
 
 macro_rules! get_bits_from_type_value {
-    ($vis:vis, u8, U8, $val:expr) => {
+    (u8, U8, $val:expr) => {
         #[cfg(any(all(feature = "u16", feature = "bits"), not(any(feature = "u16", feature = "u32", feature = "usize"))))]
-        get_bits_from_type_value!($vis, u16, U16, $val);
+        get_bits_from_type_value!(u16, U16, $val);
         #[cfg(all(not(feature = "u16"), feature = "u32"))]
-        get_bits_from_type_value!($vis, u32, U32, $val);
+        get_bits_from_type_value!(u32, U32, $val);
         #[cfg(all(not(feature = "u16"), not(feature = "u32"), feature = "usize"))]
-        get_bits_from_type_value!($vis, usize, USize, $val);
+        get_bits_from_type_value!(usize, USize, $val);
     };
-    ($vis:vis, $ty:ident, $name:ident, $val:expr $(, $feature:literal)?) => {
+    ($ty:ident, $name:ident, $val:expr $(, $feature:literal)?) => {
         concat_idents::concat_idents!(bits_ident = Bits, $name {
             /// Amount of bits, describing the size of this type
             /// Note: The type is at least 16bit
             #[cfg(feature = "bits")]
-            $vis const BITS: bits_ident = bits_ident::new($val as $ty);
+            pub const BITS: bits_ident = bits_ident::new($val as $ty);
 
             /// Amount of bits, describing the size of this type
             /// Note: The type is at least 16bit
             #[cfg(not(feature = "bits"))]
-            $vis const BITS: $ty = $val as $ty;
+            pub const BITS: $ty = $val as $ty;
         });
     }
 }
@@ -37,7 +37,7 @@ macro_rules! get_bits_from_type_value {
 #[allow(unused_macros)]
 macro_rules! generate_type_conversion_fn {
     {
-        $vis:vis $a_base_ident:ident ($a_bit_size:literal) => $b_base_ident:ident ($b_bit_size:literal) as $ident:ident {
+        $a_base_ident:ident ($a_bit_size:literal) => $b_base_ident:ident ($b_bit_size:literal) as $ident:ident {
             $(#[feature($feature:literal)] $ty:ident as $name:ident),+$(,)?
         }
     } => {
@@ -66,7 +66,7 @@ macro_rules! generate_type_conversion_fn {
                         #[doc = "}"]
                         #[doc = "```"]
                         #[must_use]
-                        $vis const fn into_b(self) -> $b_base_ident {
+                        pub const fn into_b(self) -> $b_base_ident {
                             if $a_bit_size > $b_bit_size {
                                 $b_base_ident::new(self.mul(($a_bit_size / $b_bit_size) as $ty).get())
                             } else {
@@ -88,7 +88,7 @@ macro_rules! generate_type_conversion_fn {
 /// For generating conversion functions between inner types
 macro_rules! generate_size_conversion_fn {
     {
-        $vis:vis $base_ident:ident as $ident:ident {
+        $base_ident:ident as $ident:ident {
             $(#[features($feature_a:literal, $feature_b:literal)] $(#[pointer_size($ptr_size:literal)])? $a_ty:ident as $a_name:ident $cmp:tt $b_ty:ident as $b_name:ident),+$(,)?
         }
     } => {
@@ -114,7 +114,7 @@ macro_rules! generate_size_conversion_fn {
                     #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn into_b(self) -> $b_name {
+                    pub const fn into_b(self) -> $b_name {
                         $b_name::new(self.get() as $b_ty)
                     }
                 }
@@ -136,7 +136,7 @@ macro_rules! generate_size_conversion_fn {
                     #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn into_a(self) -> $a_name {
+                    pub const fn into_a(self) -> $a_name {
                         $a_name::new(self.get() as $a_ty)
                     }
                 }
@@ -154,7 +154,7 @@ macro_rules! generate_size_conversion_fn {
 macro_rules! generate_base {
     {
         $words:ident = $bit_size:literal;
-        $vis:vis struct $base_ident:ident ($short_name:literal): $(
+        struct $base_ident:ident ($short_name:literal): $(
             #[feature($feature:literal)] $var_ty:ident as $var_ident:ident),+$(,)?
     } => {
         $(
@@ -167,17 +167,17 @@ macro_rules! generate_base {
                     feature = "zerocopy",
                     derive(FromBytes, Immutable, KnownLayout)
                 )]
-                $vis struct struct_ident {
+                pub struct struct_ident {
                    pub(self) inner: $var_ty,
                 }
 
                 #[cfg(feature = $feature)]
                 impl struct_ident {
-                    get_bits_from_type_value!($vis, $var_ty, $var_ident, $bit_size);
+                    get_bits_from_type_value!($var_ty, $var_ident, $bit_size);
 
-                    $vis const ZERO: Self = Self::new(0);
-                    $vis const ONE: Self = Self::new(1);
-                    $vis const MAX: Self = Self::new($var_ty::MAX);
+                    pub const ZERO: Self = Self::new(0);
+                    pub const ONE: Self = Self::new(1);
+                    pub const MAX: Self = Self::new($var_ty::MAX);
 
                     #[doc = "Will create a new instance of the given type"]
                     #[doc = "# Examples"]
@@ -188,7 +188,7 @@ macro_rules! generate_base {
                     #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn new($words: $var_ty) -> Self {
+                    pub const fn new($words: $var_ty) -> Self {
                        Self { inner: $words }
                     }
                     #[doc = "Gets the value as integer"]
@@ -201,7 +201,7 @@ macro_rules! generate_base {
                     #[doc = "```"]
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn get(self) -> $var_ty {
+                    pub const fn get(self) -> $var_ty {
                         self.inner
                     }
                     #[doc = "Creates new instance, depending on the size of a type"]
@@ -214,7 +214,7 @@ macro_rules! generate_base {
                     #[cfg_attr(feature = "bytes", doc = "```")]
                     #[must_use]
                     #[inline]
-                    $vis const fn of<T>() -> Self {
+                    pub const fn of<T>() -> Self {
                         let size = if $bit_size < 8 {
                             size_of::<T>() * ((8 / $bit_size) as usize)
                         } else if $bit_size == 8 {
@@ -228,82 +228,82 @@ macro_rules! generate_base {
                     #[doc = "Returns the next power of two"]
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn next_power_of_two(self) -> Self {
+                    pub const fn next_power_of_two(self) -> Self {
                         Self::new(self.inner.next_power_of_two())
                     }
 
                     /// Const addition
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn add(self, other: Self) -> Self {
+                    pub const fn add(self, other: Self) -> Self {
                         Self::new(self.inner + other.inner)
                     }
                     /// Const subtraction
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn sub(self, other: Self) -> Self {
+                    pub const fn sub(self, other: Self) -> Self {
                         Self::new(self.inner - other.inner)
                     }
                     /// Const multiplication with integer
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn mul(self, other: $var_ty) -> Self {
+                    pub const fn mul(self, other: $var_ty) -> Self {
                         Self::new(self.inner * other)
                     }
                     /// Const division with integer
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn div(self, other: $var_ty) -> Self {
+                    pub const fn div(self, other: $var_ty) -> Self {
                         Self::new(self.inner / other)
                     }
                     /// Const ceil rounding devision with integer
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn div_ceil(self, other: $var_ty) -> Self {
+                    pub const fn div_ceil(self, other: $var_ty) -> Self {
                         Self::new(self.inner.div_ceil(other))
                     }
 
                     /// Const eq
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn eq(self, other: Self) -> bool {
+                    pub const fn eq(self, other: Self) -> bool {
                         self.inner == other.inner
                     }
                     /// Const ne
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn ne(self, other: Self) -> bool {
+                    pub const fn ne(self, other: Self) -> bool {
                         self.inner != other.inner
                     }
                     /// Const gt
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn gt(self, other: Self) -> bool {
+                    pub const fn gt(self, other: Self) -> bool {
                         self.inner > other.inner
                     }
                     /// Const ge
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn ge(self, other: Self) -> bool {
+                    pub const fn ge(self, other: Self) -> bool {
                         self.inner >= other.inner
                     }
                     /// Const lt
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn lt(self, other: Self) -> bool {
+                    pub const fn lt(self, other: Self) -> bool {
                         self.inner < other.inner
                     }
                     /// Const le
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn le(self, other: Self) -> bool {
+                    pub const fn le(self, other: Self) -> bool {
                         self.inner <= other.inner
                     }
 
                     /// Const min
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn min(self, other: Self) -> Self {
+                    pub const fn min(self, other: Self) -> Self {
                         if self.lt(other) {
                             self
                         } else {
@@ -313,7 +313,7 @@ macro_rules! generate_base {
                     /// Const max
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn max(self, other: Self) -> Self {
+                    pub const fn max(self, other: Self) -> Self {
                         if self.gt(other) {
                             self
                         } else {
@@ -323,7 +323,7 @@ macro_rules! generate_base {
                     /// Const clamp
                     #[must_use]
                     #[inline(always)]
-                    $vis const fn clamp(self, min: Self, max: Self) -> Self {
+                    pub const fn clamp(self, min: Self, max: Self) -> Self {
                         assert!(min.le(max));
                         if self.le(min) {
                             min
@@ -338,7 +338,7 @@ macro_rules! generate_base {
                     #[must_use]
                     #[inline(always)]
                     #[cfg(feature = "zerocopy")]
-                    $vis fn as_byte_slice(&self) -> &[u8] {
+                    pub fn as_byte_slice(&self) -> &[u8] {
                         self.inner.as_bytes()
                     }
                 }
@@ -510,10 +510,10 @@ macro_rules! generate_base {
     };
 }
 macro_rules! generate {
-    ($vis:vis $words:ident = $bit_size:literal as $name:ident ($short_name:literal) $(, impl Into<$(#[feature($feature:literal)] $impl_ty:ident ($impl_bits:literal) as $impl_words:ident),+$(,)?>)*) => {
+    ($words:ident = $bit_size:literal as $name:ident ($short_name:literal) $(, impl Into<$(#[feature($feature:literal)] $impl_ty:ident ($impl_bits:literal) as $impl_words:ident),+$(,)?>)*) => {
         generate_base! {
             $words = $bit_size;
-            $vis struct $name ($short_name):
+            struct $name ($short_name):
                 #[feature("u8")] u8 as U8,
                 #[feature("u16")] u16 as U16,
                 #[feature("u32")] u32 as U32,
@@ -522,7 +522,7 @@ macro_rules! generate {
                 #[feature("usize")] usize as USize,
         }
         generate_size_conversion_fn! {
-            $vis $name as $words {
+            $name as $words {
                 #[features("u8", "usize")] u8 as U8 < usize as USize,
                 #[features("u8", "u16")] u8 as U8 < u16 as U16,
                 #[features("u8", "u32")] u8 as U8 < u32 as U32,
@@ -555,7 +555,7 @@ macro_rules! generate {
                 #[cfg(feature = $feature)]
                 #[cfg_attr(not(feature = $feature), allow(rust_analyzer::inactive_code))]
                 generate_type_conversion_fn! {
-                    $vis $name ($bit_size) => $impl_ty ($impl_bits) as $impl_words {
+                    $name ($bit_size) => $impl_ty ($impl_bits) as $impl_words {
                         #[feature("u8")] u8 as U8,
                         #[feature("u16")] u16 as U16,
                         #[feature("u32")] u32 as U32,
@@ -570,7 +570,7 @@ macro_rules! generate {
 }
 
 #[cfg(feature = "bits")]
-generate!(pub bits = 1 as Bits ("b"), impl Into<
+generate!(bits = 1 as Bits ("b"), impl Into<
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
     #[feature("words")] Words (32) as words,
@@ -581,7 +581,7 @@ generate!(pub bits = 1 as Bits ("b"), impl Into<
 >);
 
 #[cfg(feature = "bytes")]
-generate!(pub bytes = 8 as Bytes ("B"), impl Into<
+generate!(bytes = 8 as Bytes ("B"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("hwords")] HWords (16) as hwords,
     #[feature("words")] Words (32) as words,
@@ -592,7 +592,7 @@ generate!(pub bytes = 8 as Bytes ("B"), impl Into<
 >);
 
 #[cfg(feature = "hwords")]
-generate!(pub hwords = 16 as HWords ("HW"), impl Into<
+generate!(hwords = 16 as HWords ("HW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("words")] Words (32) as words,
@@ -603,7 +603,7 @@ generate!(pub hwords = 16 as HWords ("HW"), impl Into<
 >);
 
 #[cfg(feature = "words")]
-generate!(pub words = 32 as Words ("W"), impl Into<
+generate!(words = 32 as Words ("W"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -614,7 +614,7 @@ generate!(pub words = 32 as Words ("W"), impl Into<
 >);
 
 #[cfg(feature = "dwords")]
-generate!(pub dwords = 64 as DWords ("DW"), impl Into<
+generate!(dwords = 64 as DWords ("DW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -625,7 +625,7 @@ generate!(pub dwords = 64 as DWords ("DW"), impl Into<
 >);
 
 #[cfg(feature = "qwords")]
-generate!(pub qwords = 128 as QWords ("QW"), impl Into<
+generate!(qwords = 128 as QWords ("QW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -636,7 +636,7 @@ generate!(pub qwords = 128 as QWords ("QW"), impl Into<
 >);
 
 #[cfg(feature = "ywords")]
-generate!(pub ywords = 256 as YWords ("YW"), impl Into<
+generate!(ywords = 256 as YWords ("YW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
@@ -647,7 +647,7 @@ generate!(pub ywords = 256 as YWords ("YW"), impl Into<
 >);
 
 #[cfg(feature = "zwords")]
-generate!(pub zwords = 512 as ZWords ("ZW"), impl Into<
+generate!(zwords = 512 as ZWords ("ZW"), impl Into<
     #[feature("bits")] Bits (1) as bits,
     #[feature("bytes")] Bytes (8) as bytes,
     #[feature("hwords")] HWords (16) as hwords,
