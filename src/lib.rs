@@ -1,8 +1,13 @@
 #![no_std]
 
+use concat_idents::concat_idents;
 use core::{
     fmt::{self, Formatter, Write},
-    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
+    ops::{
+        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Deref,
+        DerefMut, Div, DivAssign, Mul, MulAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr,
+        ShrAssign, Sub, SubAssign,
+    },
 };
 #[cfg(feature = "zerocopy")]
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -19,7 +24,7 @@ macro_rules! get_bits_from_type_value {
         get_bits_from_type_value!(usize, USize, $val);
     };
     ($ty:ident, $name:ident, $val:expr $(, $feature:literal)?) => {
-        concat_idents::concat_idents!(bits_ident = Bits, $name {
+        concat_idents!(bits_ident = Bits, $name {
             /// Amount of bits, describing the size of this type
             /// Note: The type is at least 16bit
             #[cfg(feature = "bits")]
@@ -33,6 +38,113 @@ macro_rules! get_bits_from_type_value {
     }
 }
 
+macro_rules! wrap_inner {
+    (fn $name:ident $(as $as_ty:ident)? $(-> as $var_ty:ident)?) => {
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self, rhs: Self) -> Self {
+            Self::new(self.get().$name(rhs.get() $(as $as_ty)?) $(as $var_ty)?)
+        }
+    };
+    (fn $name:ident $(as $as_ty:ident)? -> bits($base_ty:ident as $base_ident:ident)) => {
+        concat_idents!(BitsTy = Bits, $base_ident {
+            #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+            #[must_use]
+            #[inline(always)]
+            #[cfg(feature = "bits")]
+            pub const fn $name(self, rhs: Self) -> BitsTy {
+                BitsTy::new(self.get().$name(rhs.get() $(as $as_ty)?) as $base_ty)
+            }
+        });
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        #[cfg(not(feature = "bits"))]
+        pub const fn $name(self, rhs: Self) -> $base_ty {
+            self.get().$name(rhs.get() $(as $as_ty)?)
+        }
+    };
+    (unsafe fn $name:ident $(as $as_ty:ident)? $(-> as $var_ty:ident)?) => {
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        pub const unsafe fn $name(self, rhs: Self) -> Self {
+            Self::new(unsafe { self.get().$name(rhs.get() $(as $as_ty)?) } $(as $var_ty)?)
+        }
+    };
+    (fn $name:ident $(as $as_ty:ident)? -> ? $(-> as $var_ty:ident)?) => {
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self, rhs: Self) -> Option<Self> {
+            match self.get().$name(rhs.get() $(as $as_ty)?) {
+                Some(val) => Some(Self::new(val $(as $var_ty)?)),
+                None => None
+            }
+        }
+    };
+    (fn $name:ident $(as $as_ty:ident)? -> ($ret_ty:ty) $(-> as $var_ty:ident)?) => {
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self, rhs: Self) -> (Self, $ret_ty) {
+            let tmp = self.get().$name(rhs.get() $(as $as_ty)?);
+            (Self::new(tmp.0 $(as $var_ty)?), tmp.1)
+        }
+    };
+    (fn $name:ident(_) $(-> as $var_ty:ident)?) => {
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self) -> Self {
+            Self::new(self.get().$name() $(as $var_ty)?)
+        }
+    };
+    (fn $name:ident(_) -> bits($base_ty:ident as $base_ident:ident)) => {
+        concat_idents!(BitsTy = Bits, $base_ident {
+            #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+            #[must_use]
+            #[inline(always)]
+            #[cfg(feature = "bits")]
+            pub const fn $name(self) -> BitsTy {
+                BitsTy::new(self.get().$name() as $base_ty)
+            }
+        });
+        #[doc = concat!("Const wrapper for `", stringify!($name), "` function.")]
+        #[must_use]
+        #[inline(always)]
+        #[cfg(not(feature = "bits"))]
+        pub const fn $name(self) -> $base_ty {
+            self.$name()
+        }
+    };
+
+    (fn $name:ident($wrapped:tt)) => {
+        #[doc = concat!("Const wrapper for `", stringify!($wrapped), "` operator.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self, rhs: Self) -> Self {
+            Self::new(self.get() $wrapped rhs.get())
+        }
+    };
+    (fn $name:ident($wrapped:tt) -> $ret_ty:ty) => {
+        #[doc = concat!("Const wrapper for `", stringify!($wrapped), "` operator.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self, rhs: Self) -> $ret_ty {
+            self.get() $wrapped rhs.get()
+        }
+    };
+    (fn $name:ident($wrapped:tt _)) => {
+        #[doc = concat!("Const wrapper for `", stringify!($wrapped), "` operator.")]
+        #[must_use]
+        #[inline(always)]
+        pub const fn $name(self) -> Self {
+            Self::new($wrapped self.get())
+        }
+    };
+}
 /// For generating conversion functions between data types
 #[allow(unused_macros)]
 macro_rules! generate_type_conversion_fn {
@@ -45,13 +157,13 @@ macro_rules! generate_type_conversion_fn {
             #[cfg(feature = $feature)]
             #[cfg_attr(not(feature = $feature), allow(rust_analyzer::inactive_code))]
             const _: () = {
-                concat_idents::concat_idents!(a = $a_base_ident, $name {
+                concat_idents!(a = $a_base_ident, $name {
                     type $a_base_ident = a;
                 });
-                concat_idents::concat_idents!(b = $b_base_ident, $name {
+                concat_idents!(b = $b_base_ident, $name {
                     type $b_base_ident = b;
                 });
-                concat_idents::concat_idents!(into_b = as_, $ident {
+                concat_idents!(into_b = as_, $ident {
                     impl $a_base_ident {
                         #[doc = concat!("Converts a ", stringify!($a_base_ident), stringify!($name), " into a ", stringify!($b_base_ident), stringify!($name))]
                         #[doc = "# Example"]
@@ -62,15 +174,15 @@ macro_rules! generate_type_conversion_fn {
                         #[doc = concat!("if ", stringify!($a_bit_size), " > ", stringify!($b_bit_size), " {")]
                         #[doc = concat!("    assert_eq!(*", stringify!($ident), ", *a * (", stringify!($a_bit_size), " / ", stringify!($b_bit_size), ") as ", stringify!($ty), ");")]
                         #[doc = "} else {"]
-                        #[doc = concat!("    assert_eq!(*", stringify!($ident), ", *a.div_ceil((", stringify!($b_bit_size), " / ", stringify!($a_bit_size), ").min(1) as ", stringify!($ty), "));")]
+                        #[doc = concat!("    assert_eq!(*", stringify!($ident), ", (*a).div_ceil((", stringify!($b_bit_size), " / ", stringify!($a_bit_size), ").min(1) as ", stringify!($ty), "));")]
                         #[doc = "}"]
                         #[doc = "```"]
                         #[must_use]
                         pub const fn into_b(self) -> $b_base_ident {
                             if $a_bit_size > $b_bit_size {
-                                $b_base_ident::new(self.mul(($a_bit_size / $b_bit_size) as $ty).get())
+                                $b_base_ident::new(self.mul(Self::new(($a_bit_size / $b_bit_size) as $ty)).get())
                             } else {
-                                $b_base_ident::new(self.div_ceil((if ($b_bit_size / $a_bit_size) as $ty == 0 { 1 } else { $b_bit_size / $a_bit_size }) as $ty).get())
+                                $b_base_ident::new(self.div_ceil((if ($b_bit_size / $a_bit_size) as $ty == 0 { Self::ONE } else { Self::new(($b_bit_size / $a_bit_size) as $ty)})).get())
                             }
                         }
                     }
@@ -96,13 +208,13 @@ macro_rules! generate_size_conversion_fn {
             #[cfg(all(feature = $feature_a, feature = $feature_b$(, target_pointer_width = $ptr_size)?))]
             #[cfg_attr(not(all(feature = $feature_a, feature = $feature_b$(, target_pointer_width = $ptr_size)?)), allow(rust_analyzer::inactive_code))]
             const _: () = {
-            concat_idents::concat_idents!(a = $base_ident, $a_name {
+            concat_idents!(a = $base_ident, $a_name {
                 type $a_name = a;
             });
-            concat_idents::concat_idents!(b = $base_ident, $b_name {
+            concat_idents!(b = $base_ident, $b_name {
                 type $b_name = b;
             });
-            concat_idents::concat_idents!(into_b = as_, $b_ty {
+            concat_idents!(into_b = as_, $b_ty {
                 impl $a_name {
                     #[doc = concat!("Converts a ", stringify!($base_ident), stringify!($a_name), " into a ", stringify!($base_ident), stringify!($b_name))]
                     #[doc = "# Example:"]
@@ -125,7 +237,7 @@ macro_rules! generate_size_conversion_fn {
                     }
                 }
             });
-            concat_idents::concat_idents!(into_a = as_, $a_ty {
+            concat_idents!(into_a = as_, $a_ty {
                 impl $b_name {
                     #[doc = concat!("Converts a ", stringify!($base_ident), stringify!($b_name), " into a ", stringify!($base_ident), stringify!($a_name))]
                     #[doc = "# Example:"]
@@ -158,7 +270,7 @@ macro_rules! generate_base {
             #[feature($feature:literal)] $var_ty:ident as $var_ident:ident),+$(,)?
     } => {
         $(
-            concat_idents::concat_idents!(struct_ident = $base_ident, $var_ident {
+            concat_idents!(struct_ident = $base_ident, $var_ident {
                 #[doc = "Const zero cost abstraction to add differenciate data size types."]
                 #[cfg(feature = $feature)]
                 #[repr(transparent)]
@@ -177,6 +289,7 @@ macro_rules! generate_base {
 
                     pub const ZERO: Self = Self::new(0);
                     pub const ONE: Self = Self::new(1);
+                    pub const MIN: Self = Self::new($var_ty::MIN);
                     pub const MAX: Self = Self::new($var_ty::MAX);
 
                     #[doc = "Will create a new instance of the given type"]
@@ -225,80 +338,95 @@ macro_rules! generate_base {
                         assert!(size <= $var_ty::MAX as usize);
                         Self::new(size as $var_ty)
                     }
-                    #[doc = "Returns the next power of two"]
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn next_power_of_two(self) -> Self {
-                        Self::new(self.inner.next_power_of_two())
-                    }
 
-                    /// Const addition
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn add(self, other: Self) -> Self {
-                        Self::new(self.inner + other.inner)
-                    }
-                    /// Const subtraction
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn sub(self, other: Self) -> Self {
-                        Self::new(self.inner - other.inner)
-                    }
-                    /// Const multiplication with integer
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn mul(self, other: $var_ty) -> Self {
-                        Self::new(self.inner * other)
-                    }
-                    /// Const division with integer
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn div(self, other: $var_ty) -> Self {
-                        Self::new(self.inner / other)
-                    }
-                    /// Const ceil rounding devision with integer
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn div_ceil(self, other: $var_ty) -> Self {
-                        Self::new(self.inner.div_ceil(other))
-                    }
+                    wrap_inner!(fn add(+));
+                    wrap_inner!(fn checked_add -> ?);
+                    wrap_inner!(fn wrapping_add);
+                    wrap_inner!(fn saturating_add);
+                    wrap_inner!(fn overflowing_add -> (bool));
+                    wrap_inner!(fn strict_add);
+                    wrap_inner!(unsafe fn unchecked_add);
 
-                    /// Const eq
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn eq(self, other: Self) -> bool {
-                        self.inner == other.inner
-                    }
-                    /// Const ne
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn ne(self, other: Self) -> bool {
-                        self.inner != other.inner
-                    }
-                    /// Const gt
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn gt(self, other: Self) -> bool {
-                        self.inner > other.inner
-                    }
-                    /// Const ge
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn ge(self, other: Self) -> bool {
-                        self.inner >= other.inner
-                    }
-                    /// Const lt
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn lt(self, other: Self) -> bool {
-                        self.inner < other.inner
-                    }
-                    /// Const le
-                    #[must_use]
-                    #[inline(always)]
-                    pub const fn le(self, other: Self) -> bool {
-                        self.inner <= other.inner
-                    }
+                    wrap_inner!(fn sub(+));
+                    wrap_inner!(fn checked_sub -> ?);
+                    wrap_inner!(fn wrapping_sub);
+                    wrap_inner!(fn saturating_sub);
+                    wrap_inner!(fn overflowing_sub -> (bool));
+                    wrap_inner!(fn strict_sub);
+                    wrap_inner!(unsafe fn unchecked_sub);
+
+                    wrap_inner!(fn mul(*));
+                    wrap_inner!(fn checked_mul -> ?);
+                    wrap_inner!(fn wrapping_mul);
+                    wrap_inner!(fn saturating_mul);
+                    wrap_inner!(fn overflowing_mul -> (bool));
+                    wrap_inner!(fn strict_mul);
+                    wrap_inner!(unsafe fn unchecked_mul);
+
+                    wrap_inner!(fn div(*));
+                    wrap_inner!(fn checked_div -> ?);
+                    wrap_inner!(fn wrapping_div);
+                    wrap_inner!(fn saturating_div);
+                    wrap_inner!(fn overflowing_div -> (bool));
+                    wrap_inner!(fn strict_div);
+                    wrap_inner!(fn div_ceil);
+
+                    wrap_inner!(fn rem(%));
+                    wrap_inner!(fn checked_rem -> ?);
+                    wrap_inner!(fn wrapping_rem);
+                    wrap_inner!(fn overflowing_rem -> (bool));
+                    wrap_inner!(fn strict_rem);
+
+                    wrap_inner!(fn abs_diff);
+                    wrap_inner!(fn ilog -> as $var_ty);
+                    wrap_inner!(fn ilog10(_) -> as $var_ty);
+                    wrap_inner!(fn ilog2(_) -> as $var_ty);
+                    wrap_inner!(fn isqrt(_) -> as $var_ty);
+                    wrap_inner!(fn midpoint);
+                    wrap_inner!(fn next_multiple_of);
+                    wrap_inner!(fn next_power_of_two(_));
+
+                    wrap_inner!(fn eq(==) -> bool);
+                    wrap_inner!(fn ne(!=) -> bool);
+                    wrap_inner!(fn gt(>) -> bool);
+                    wrap_inner!(fn lt(<) -> bool);
+                    wrap_inner!(fn ge(>=) -> bool);
+                    wrap_inner!(fn le(<=) -> bool);
+
+                    wrap_inner!(fn bitand(&));
+                    wrap_inner!(fn bitor(|));
+                    wrap_inner!(fn bitxor(^));
+                    wrap_inner!(fn not(!_));
+
+                    wrap_inner!(fn shl(<<));
+                    wrap_inner!(fn checked_shl as u32 -> ?);
+                    wrap_inner!(fn wrapping_shl as u32);
+                    wrap_inner!(fn overflowing_shl as u32 -> (bool));
+                    wrap_inner!(fn unbounded_shl as u32);
+                    wrap_inner!(fn strict_shl as u32);
+                    wrap_inner!(unsafe fn unchecked_shl as u32);
+
+                    wrap_inner!(fn shr(>>));
+                    wrap_inner!(fn checked_shr as u32 -> ?);
+                    wrap_inner!(fn wrapping_shr as u32);
+                    wrap_inner!(fn overflowing_shr as u32 -> (bool));
+                    wrap_inner!(fn unbounded_shr as u32);
+                    wrap_inner!(fn strict_shr as u32);
+                    wrap_inner!(unsafe fn unchecked_shr as u32);
+
+                    wrap_inner!(fn bit_width(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn count_ones(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn count_zeros(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn isolate_highest_one(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn isolate_lowest_one(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn leading_ones(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn leading_zeros(_) -> bits($var_ty as $var_ident));
+                    wrap_inner!(fn reverse_bits(_));
+                    wrap_inner!(fn swap_bytes(_));
+                    wrap_inner!(fn to_be(_));
+                    wrap_inner!(fn to_le(_));
+                    wrap_inner!(fn rotate_left as u32);
+                    wrap_inner!(fn rotate_right as u32);
 
                     /// Const min
                     #[must_use]
@@ -373,6 +501,145 @@ macro_rules! generate_base {
                     #[inline(always)]
                     fn sub_assign(&mut self, rhs: Self) {
                         *self = self.sub(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl Mul for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn mul(self, rhs: Self) -> Self::Output {
+                        self.mul(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl MulAssign for struct_ident {
+                    #[inline(always)]
+                    fn mul_assign(&mut self, rhs: Self) {
+                        *self = self.mul(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl Div for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn div(self, rhs: Self) -> Self::Output {
+                        self.div(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl DivAssign for struct_ident {
+                    #[inline(always)]
+                    fn div_assign(&mut self, rhs: Self) {
+                        *self = self.div(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl Rem for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn rem(self, rhs: Self) -> Self::Output {
+                        self.rem(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl RemAssign for struct_ident {
+                    #[inline(always)]
+                    fn rem_assign(&mut self, rhs: Self) {
+                        *self = self.rem(rhs);
+                    }
+                }
+
+                #[cfg(feature = $feature)]
+                impl BitAnd for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn bitand(self, rhs: Self) -> Self::Output {
+                        self.bitand(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl BitAndAssign for struct_ident {
+                    #[inline(always)]
+                    fn bitand_assign(&mut self, rhs: Self) {
+                        *self = self.bitand(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl BitOr for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn bitor(self, rhs: Self) -> Self::Output {
+                        self.bitor(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl BitOrAssign for struct_ident {
+                    #[inline(always)]
+                    fn bitor_assign(&mut self, rhs: Self) {
+                        *self = self.bitor(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl BitXor for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn bitxor(self, rhs: Self) -> Self::Output {
+                        self.bitxor(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl BitXorAssign for struct_ident {
+                    #[inline(always)]
+                    fn bitxor_assign(&mut self, rhs: Self) {
+                        *self = self.bitxor(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl Not for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn not(self) -> Self::Output {
+                        self.not()
+                    }
+                }
+
+                #[cfg(feature = $feature)]
+                impl Shl for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn shl(self, rhs: Self) -> Self::Output {
+                        self.shl(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl ShlAssign for struct_ident {
+                    #[inline(always)]
+                    fn shl_assign(&mut self, rhs: Self) {
+                        *self = self.shl(rhs);
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl Shr for struct_ident {
+                    type Output = Self;
+
+                    #[inline(always)]
+                    fn shr(self, rhs: Self) -> Self::Output {
+                        self.shr(rhs)
+                    }
+                }
+                #[cfg(feature = $feature)]
+                impl ShrAssign for struct_ident {
+                    #[inline(always)]
+                    fn shr_assign(&mut self, rhs: Self) {
+                        *self = self.shr(rhs);
                     }
                 }
 
@@ -656,3 +923,24 @@ generate!(zwords = 512 as ZWords ("ZW"), impl Into<
     #[feature("qwords")] QWords (128) as qwords,
     #[feature("ywords")] YWords (256) as ywords,
 >);
+
+#[test]
+fn test() {
+    #![allow(unused)]
+    let a: u128 = 10;
+    let b: u32 = 20;
+
+    a.bit_width();
+    a.count_ones();
+    a.count_zeros();
+    a.isolate_highest_one();
+    a.isolate_lowest_one();
+    a.leading_ones();
+    a.leading_zeros();
+    a.reverse_bits();
+    a.rotate_left(b);
+    a.rotate_right(b);
+    a.swap_bytes();
+    a.to_be();
+    a.to_le();
+}
