@@ -347,7 +347,7 @@ macro_rules! generate_base {
                     wrap_inner!(fn strict_add);
                     wrap_inner!(unsafe fn unchecked_add);
 
-                    wrap_inner!(fn sub(+));
+                    wrap_inner!(fn sub(-));
                     wrap_inner!(fn checked_sub -> ?);
                     wrap_inner!(fn wrapping_sub);
                     wrap_inner!(fn saturating_sub);
@@ -363,7 +363,7 @@ macro_rules! generate_base {
                     wrap_inner!(fn strict_mul);
                     wrap_inner!(unsafe fn unchecked_mul);
 
-                    wrap_inner!(fn div(*));
+                    wrap_inner!(fn div(/));
                     wrap_inner!(fn checked_div -> ?);
                     wrap_inner!(fn wrapping_div);
                     wrap_inner!(fn saturating_div);

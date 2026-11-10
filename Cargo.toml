@@ -1,6 +1,6 @@
 [package]
 name = "anysize"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 license-file = "LICENSE.md"
 description = "A const no-std zero cost abstraction, adding types for data sizes"
